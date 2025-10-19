@@ -31,6 +31,26 @@ class Packet:
         if self.payload:
             packet_bytes += self.payload.build() # Build the bytes of the payload layer recursively
         return packet_bytes
+    def __truediv__(self, other):
+        """
+        Description: Overloads the division (/) operator to allow stacking of protocol layers.
+
+        @param other: The higher-layer packet to encapsulate as this packet’s payload.
+        @returns: The current packet instance (to allow chaining).
+        """
+        self.payload = other
+
+        # Handle auto IP propagation for transport layers
+        if hasattr(self, 'src_ip') and hasattr(self, 'dst_ip'):
+            # self is likely an IP layer
+            if hasattr(other, 'src_port') and hasattr(other, 'dst_port'):
+                # other is likely TCP or UDP layer
+                if not hasattr(other, 'src_ip'):
+                    other.src_ip = self.src_ip
+                if not hasattr(other, 'dst_ip'):
+                    other.dst_ip = self.dst_ip
+
+        return self
     def show(self, indent=0):
         """
         Description: Prints a hierarchical, human-readable view of the packet’s header fields and payload layers.
