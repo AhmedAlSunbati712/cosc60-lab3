@@ -20,12 +20,12 @@ def send(pkt):
     sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_RAW)
 
     # Send using destination IP from IP layer
-    sock.sendto(packet_bytes, (pkt.dst_ip, 0))
+    sock.sendto(packet_bytes, (pkt.dest_IP, 0))
     sock.close()
-    print(f"[+] sent packet to {pkt.dest_ip} (layer 3)")
+    print(f"[+] sent packet to {pkt.dest_IP} (layer 3)")
     sock.close()
     
-def sendp(pkt, interface):
+def sendp(packet, interface):
     """
     Description: Transmit a packet at Layer 2 (Ethernet). Uses a raw socket with AF_PACKET.
                  You must include the full Ethernet frame (Ether + higher layers).
@@ -47,7 +47,7 @@ def sendp(pkt, interface):
 
 
 
-def sr(pkt, timeout=2):
+def sr(packet, timeout=2):
     """
     Description: Sends a packet at Layer 3 and receives a reply.
                  Uses a raw socket (AF_INET, SOCK_RAW) for sending
@@ -90,7 +90,7 @@ def sr(pkt, timeout=2):
         recv_sock.close()
 
 
-def sniff():
+def sniff(timeout=5):
     """
     Description: Captures one packet at Layer 2 on any interface.
                  Builds a Packet hierarchy (starting from Ether) from received bytes
