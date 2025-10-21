@@ -110,9 +110,19 @@ class IP(Packet):
         #     payload_b = self.payload.to_bytes() if hasattr(self.payload, 'to_bytes') else (self.payload if isinstance(self.payload, bytes) else b'')
         # else:
         #     payload_b = b''
-        payload_bytes = self.payload.to_bytes() if hasattr(self.payload, 'to_bytes') else b''
+        if self.payload:
+            if hasattr(self.payload, 'build'):
+                payload_bytes = self.payload.build()
+            elif hasattr(self.payload, 'to_bytes'):
+                payload_bytes = self.payload.to_bytes()
+            elif isinstance(self.payload, bytes):
+                payload_bytes = self.payload
+            else:
+                payload_bytes = b''
+        else:
+            payload_bytes = b''
         self.total_len = 20 + len(payload_bytes)
-    
+            
         #pass in 0 as a place holder for the checksum and convert ip string to bytes
         IP_header = struct.pack('!BBHHHBBH4s4s', version_ihl, self.tos, self.total_len, 
                                 self.ID, self.flags_frag, self.TTL, self.protocol, 0, socket.inet_aton(self.src_IP), socket.inet_aton(self.dest_IP))
@@ -123,5 +133,5 @@ class IP(Packet):
         #add payload to ipheader
     
         return header + payload_bytes
-
-   
+    
+    
