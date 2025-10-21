@@ -8,6 +8,7 @@ import time
 from network_utils import send
 from network_utils import sendp
 from network_utils import sniff
+from network_utils import sr
 
 # =========================
 # ICMP Test Function
