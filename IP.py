@@ -1,11 +1,13 @@
 """
 IP.py      COSC 60      Oct 19th, 2025
 
+
 Author: Dejanae Green
 Description: Implements the IPv4 protocol layer (Layer 3).
              Supports building IPv4 headers, checksum calculation,
              and parsing from raw bytes.
 """
+
 
 import struct
 import socket
@@ -14,11 +16,14 @@ from ICMP import ICMP
 import random
 
 
+
+
 class IP(Packet):
     def __init__(self, src_IP= None, dest_IP= None, payload=None, ttl=128, protocol=1, raw=None):
         """
         Description: Initializes an IPv4 packet. Can construct from provided
                      fields (for sending) or parse from raw bytes (for receiving).
+
 
         @param src_IP: Source IPv4 address.
         @param dest_IP: Destination IPv4 address.
@@ -31,6 +36,7 @@ class IP(Packet):
         # ID: Identification field.
         # flags_frag: Flags + Fragment offset field.
         super().__init__(payload)
+
 
         if raw:
             #first 20 bytes is IP header
@@ -53,6 +59,7 @@ class IP(Packet):
             self.version = version_ihl >> 4
             self.ihl = version_ihl & 0x0F
 
+
             #parse payload
             payload_data = raw[20:]
             if self.protocol == 1:
@@ -60,6 +67,7 @@ class IP(Packet):
             else:
                 self.payload= payload_data
        
+
 
         #default values
         else:
@@ -75,13 +83,14 @@ class IP(Packet):
             self.checksum = 0
             self.src_IP = src_IP
             self.dest_IP = dest_IP
-    
+   
 #used these sources to help me: https://medium.com/@tom_84912/the-quaint-but-critical-internet-checksum-05c09eb0af77
 #https://gist.github.com/david-hoze/0c7021434796997a4ca42d7731a7073a?permalink_comment_id=3949455
 #https://stackoverflow.com/questions/50321292/calculating-ip-checksum-in-c
     def checksum_IP(self, data):
         """
         Description: Computes IPv4 header checksum.
+
 
         @param data: IPv4 header with checksum set to 0.
         @returns: 16-bit checksum.
@@ -98,40 +107,33 @@ class IP(Packet):
         return (~sumd) & 0xFFFF
 
 
-        
+
+
+       
     def to_bytes(self):
         '''
         Description: Byte representation of the IPv4 packet
         @returns: complete byte sequence of the IP packet
         '''
 
+
         version_ihl = (self.version << 4) + self.ihl
         # if self.payload:
         #     payload_b = self.payload.to_bytes() if hasattr(self.payload, 'to_bytes') else (self.payload if isinstance(self.payload, bytes) else b'')
         # else:
         #     payload_b = b''
-        if self.payload:
-            if hasattr(self.payload, 'build'):
-                payload_bytes = self.payload.build()
-            elif hasattr(self.payload, 'to_bytes'):
-                payload_bytes = self.payload.to_bytes()
-            elif isinstance(self.payload, bytes):
-                payload_bytes = self.payload
-            else:
-                payload_bytes = b''
-        else:
-            payload_bytes = b''
+        payload_bytes = self.payload.to_bytes() if hasattr(self.payload, 'to_bytes') else b''
         self.total_len = 20 + len(payload_bytes)
-            
+   
         #pass in 0 as a place holder for the checksum and convert ip string to bytes
-        IP_header = struct.pack('!BBHHHBBH4s4s', version_ihl, self.tos, self.total_len, 
+        IP_header = struct.pack('!BBHHHBBH4s4s', version_ihl, self.tos, self.total_len,
                                 self.ID, self.flags_frag, self.TTL, self.protocol, 0, socket.inet_aton(self.src_IP), socket.inet_aton(self.dest_IP))
         #calcuate checksum
         self.checksum = self.checksum_IP(IP_header)
-        header = struct.pack('!BBHHHBBH4s4s', version_ihl, self.tos, self.total_len, self.ID, self.flags_frag, 
+        header = struct.pack('!BBHHHBBH4s4s', version_ihl, self.tos, self.total_len, self.ID, self.flags_frag,
                                 self.TTL, self.protocol, self.checksum, socket.inet_aton(self.src_IP), socket.inet_aton(self.dest_IP))
         #add payload to ipheader
-    
+   
         return header + payload_bytes
-    
-    
+
+

@@ -1,7 +1,6 @@
 #Nmae: Dejanae Green
 #Date: 10/19/25
 #Purpose: tester file for the ICMP ping lab3
-#usage: sudo python3 ICMP_ping.py
 from Ether import Ether
 from IP import IP
 from ICMP import ICMP
@@ -11,7 +10,9 @@ from network_utils import sendp
 from network_utils import sniff
 from network_utils import sr
 
-
+# =========================
+# ICMP Test Function
+# =========================
 if __name__ == "__main__":
     INTERFACE = "enp0s3"
     MY_IP = "10.0.2.15"
@@ -30,29 +31,35 @@ if __name__ == "__main__":
     pkt.show()
 
     # Send at Layer 3
+    print("[*]Testing send() : sending packet at layer 3")
     send(pkt)
-    time.sleep(1)
+    #extra seconds so i can screenshot in between couldve also called seperately
+    time.sleep(10)
 
     # Send at Layer 2
+    print("[*] Testing sendp(): sending packet at layer 2")
     sendp(pkt, INTERFACE)
-    time.sleep(1)
+    time.sleep(10)
 
     # Sniff one packet
     #sniff here because if sniffed at end wont work
-    print(f"[*] Sniffing for one packet at Layer 2...")
-    sniffed_pkt = sniff(timeout=5)
+    
+    print(f"[*] Testing sniff() : Sniffing for one packet at Layer 2...")
+    sniffed_pkt = sniff(timeout=10)
     if sniffed_pkt:
         print("[+] Sniffed packet sucessfully!")
     else:
         print("[-] No packet sniffed.")
 
+    print(f"[*] Testing sr() : send and recieve")
     # Send + receive (Layer 3 + reply)
-    reply = sr(pkt, timeout=5)
+    reply = sr(pkt, timeout=10)
     if reply:
         print("[+] ICMP reply received!")
 
    
     pkt_bytes = pkt.build()
     print(f"[*] Final packet length: {len(pkt_bytes)} bytes")
+
 
 

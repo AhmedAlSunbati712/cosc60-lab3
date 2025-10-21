@@ -58,7 +58,7 @@ class ICMP(Packet):
         sumd += sumd >> 16
         #complment of the 16-bit sum mask to 16 bits
         return (~sumd) & 0xFFFF
-def to_bytes(self):
+    def to_bytes(self):
         """
         Description: Parses ICMP header and data from raw bytes.
         """

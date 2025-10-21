@@ -23,14 +23,11 @@ DNS_PORT = 53
 #DNS query to get the domain IP addr
 DNS_pkt = DNS(qname=DOMAIN)
 UDP_pkt = UDP(src_port=SRC_PORT, dst_port=DNS_PORT, payload=DNS_pkt, src_ip=SRC_IP, dst_ip="1.1.1.1")
-# print("[DEBUG] Full IP packet:")
 IP_pkt = IP(src_IP=SRC_IP, dest_IP= "1.1.1.1", protocol=17, payload=UDP_pkt)
 DNS_pkt.show()
-# print(f"\n[DEBUG] Full packet bytes ({len(IP_pkt.build())} bytes):")
+
 print(IP_pkt.build().hex())
-# print(f"[DEBUG] UDP checksum: 0x{UDP_pkt.checksum:04x}")
-# print(f"[DEBUG] UDP length: {UDP_pkt.length}")
-# print(f"[DEBUG] UDP full packet: {UDP_pkt.build().hex()}")
+
 
 
 
