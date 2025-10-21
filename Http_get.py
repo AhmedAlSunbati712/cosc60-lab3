@@ -1,7 +1,7 @@
 #Author: Dejanae Green
 #Date: 10/20/25
 #Purpose: tester file for the http get request
-
+#not fully functioning is not recieving the dns reply
 import socket, subprocess, time, random
 from IP import IP
 from TCP import TCP
@@ -22,19 +22,18 @@ DNS_PORT = 53
 
 #DNS query to get the domain IP addr
 DNS_pkt = DNS(qname=DOMAIN)
-UDP_pkt = UDP(src_port=SRC_PORT, dst_port=DNS_PORT, payload=DNS_pkt, src_ip=SRC_IP, dst_ip="1.1.1.1")
-IP_pkt = IP(src_IP=SRC_IP, dest_IP= "1.1.1.1", protocol=17, payload=UDP_pkt)
+#portocol 17 is udp
+UDP_pkt = UDP(src_port=SRC_PORT, dst_port=DNS_PORT, payload=DNS_pkt, src_ip=SRC_IP, dst_ip="8.8.8.8")
+IP_pkt = IP(src_IP=SRC_IP, dest_IP= "8.8.8.8", protocol=17, payload=UDP_pkt)
 DNS_pkt.show()
+#raw packet bytes for debugging
+# print(IP_pkt.build().hex())
 
-print(IP_pkt.build().hex())
-
-
-
-
+#semnd DNS query and wait for repsonse
 reply = sr(IP_pkt, timeout=7)
-
+#keep trying until get a reply from DNS server
 while reply:
-    if hasattr(reply, 'src_IP') and reply.src_IP == "1.1.1.1":
+    if hasattr(reply, 'src_IP') and reply.src_IP == "8.8.8.8":
         break
     reply = sr(IP_pkt, timeout=7)
 if not reply or not hasattr(reply, 'payload'):
@@ -48,10 +47,13 @@ if isinstance(UDP_layer, bytes):
 else:
     #already in raw bytes
     UDP_obj = UDP_layer
+#get dta from UDP payload
 DNS_obj = UDP_obj.data 
+#parses header and answer section
 header = DNS_obj[:12]
 qname_len = len(DNS_pkt._encode_qname(DOMAIN)) + 4
 answer_offset = 12 + qname_len
+#get the ip adress from the dns answer
 vibrant_IP_bytes = DNS_obj[answer_offset + 10: answer_offset + 14]
 vibrant_IP = ".".join(str(b) for b in vibrant_IP_bytes)
 print(f"[+] {DOMAIN} IP: {vibrant_IP}")
@@ -66,8 +68,11 @@ seqN = 1000
 SYN_pkt = TCP(src_port=SRC_PORT, dst_port=DST_PORT, seq=seqN, flags=0X02, ip_src=SRC_IP, ip_dst=vibrant_IP)
 IP_SYN = IP(src_IP=SRC_IP, dest_IP=vibrant_IP, protocol=6, payload=SYN_pkt)
 SYN_ACK_reply = sr(IP_SYN, timeout=3)
+
+#send SYN and wait for SYN-ACK
 if not SYN_ACK_reply:
     raise Exception(" No SYN-ACK reply received")
+#get server TCP
 server_TCP = SYN_ACK_reply.payload.payload
 server_seq = server_TCP.seq
 

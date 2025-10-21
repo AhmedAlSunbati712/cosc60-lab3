@@ -10,9 +10,9 @@ from network_utils import sendp
 from network_utils import sniff
 from network_utils import sr
 
-# =========================
+
 # ICMP Test Function
-# =========================
+
 if __name__ == "__main__":
     INTERFACE = "enp0s3"
     MY_IP = "10.0.2.15"
