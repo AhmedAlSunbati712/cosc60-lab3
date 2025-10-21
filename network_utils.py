@@ -22,7 +22,8 @@ def send(pkt):
     # Send using destination IP from IP layer
     sock.sendto(packet_bytes, (pkt.dst_ip, 0))
     sock.close()
-    print(f"[send] Sent {len(packet_bytes)} bytes to {pkt.dst_ip} at layer 3.")
+    print(f"[+] sent packet to {pkt.dest_ip} (layer 3)")
+    sock.close()
     
 def sendp(pkt, interface):
     """
@@ -33,14 +34,17 @@ def sendp(pkt, interface):
     @param interface: The name of the network interface to send from (e.g., 'eth0', 'ens33').
     @returns: None
     """
-    packet_bytes = pkt.build()
-
+    #packet must start with ether to send
+    if not isinstance(packet, Ether):
+        raise ValueError("Packet msut start with Ether to send")
     sock = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
     sock.bind((interface, 0))
-
+    packet_bytes = packet.build()
     sock.send(packet_bytes)
+    print(f"[+] sent packet on {interface} (layer 2)")
+    #close the socket
     sock.close()
-    print(f"[sendp] Sent {len(packet_bytes)} bytes on {interface} at layer 2.")
+
 
 
 def sr(pkt, timeout=2):
@@ -53,63 +57,62 @@ def sr(pkt, timeout=2):
     @param timeout: Timeout in seconds to wait for a reply.
     @returns: The received packet object built from reply bytes.
     """
-    # If top layer is Ethernet, move to its payload
-    if isinstance(pkt, Ether):
-        pkt = pkt.payload
-
-    # Build packet bytes for transmission
-    packet_bytes = pkt.build()
-
-    # Send at layer 3
+    if isinstance(packet, Ether):
+            l3_pkt= packet.payload
+    else:
+        l3_pkt = packet
+    if l3_pkt is None:
+        raise ValueError(" No IP layer found to send")
+    
+    #send socket
     send_sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_RAW)
-    send_sock.sendto(packet_bytes, (pkt.dst_ip, 0))
-    print(f"[sr] Sent {len(packet_bytes)} bytes to {pkt.dst_ip} (waiting for reply...)")
+    dest_ip = l3_pkt.dest_IP
+    send_sock.sendto(l3_pkt.build(), (dest_ip, 0))
+    print( f"[+] sent packet to {dest_ip}, waiting for reply...")
 
-    # Receive at layer 2 (any interface)
+    #recieve socket
     recv_sock = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(0x0003))
     recv_sock.settimeout(timeout)
 
     try:
-        reply_bytes, addr = recv_sock.recvfrom(65535)
-        print(f"[sr] Received {len(reply_bytes)} bytes from {addr}")
-
-        # Construct an Ether object from received bytes
-        reply_pkt = Ether(reply_bytes)
-        reply_pkt.show()
-        return reply_pkt
-
+        raw_bytes, addr = recv_sock.recvfrom(65535)
+        pkt_recv = Ether(raw=raw_bytes)
+        print("[+] Received reply")
+        pkt_recv.show()
+        return pkt_recv 
+    #if no reply recieved by timeout send message and return none
     except socket.timeout:
-        print("[sr] Timeout waiting for reply.")
+        print("[-] Timeout: No reply received")
         return None
-
     finally:
+        #close both sockets
         send_sock.close()
         recv_sock.close()
 
-def sniff(timeout=5):
+
+def sniff():
     """
     Description: Captures one packet at Layer 2 on any interface.
                  Builds a Packet hierarchy (starting from Ether) from received bytes
                  and displays it using the show() method.
 
-    @param timeout: Timeout in seconds to wait for a packet.
+
     @returns: The captured packet object built from received bytes.
     """
+    #open socket to recieve packet
     recv_sock = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(0x0003))
-    recv_sock.settimeout(timeout)
-
+    recv_sock.settimeout(5)
     try:
-        pkt_bytes, addr = recv_sock.recvfrom(65535)
-        print(f"[sniff] Captured {len(pkt_bytes)} bytes from {addr}")
-
-        # Parse the packet starting at Ethernet
-        pkt = Ether(pkt_bytes)
-        pkt.show()
-        return pkt
-
+        raw_bytes,addr = recv_sock.recvfrom(65535)
+        pkt_recv = Ether(raw=raw_bytes)
+        print("[+] Sniffed a packet")
+        #print what was recieved
+        pkt_recv.show()
+        return pkt_recv
     except socket.timeout:
-        print("[sniff] Timeout: no packet captured.")
+        #timeout and no packet was recieved on socket
+        print("[-] Timeout: No packet recieved")
         return None
-
     finally:
+        #close sock
         recv_sock.close()

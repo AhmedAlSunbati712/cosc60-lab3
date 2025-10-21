@@ -13,77 +13,52 @@ from IP import IP
 
 
 class Ether(Packet):
-    def __init__(self, src_mac=None, dst_mac=None, eth_type=0x0800, payload=None, raw_bytes=None):
+    def __init__(self, dest_mac=None, src_mac=None, ethr_type=0x0800, payload=b'', raw=None):
         """
         Description: Initializes an Ethernet frame. Can be built from header fields or parsed from raw bytes.
 
         @param src_mac: Source MAC address, e.g. "aa:bb:cc:dd:ee:ff"
-        @param dst_mac: Destination MAC address, e.g. "ff:ff:ff:ff:ff:ff"
-        @param eth_type: EtherType field (default 0x0800 for IPv4)
+        @param dest_mac: Destination MAC address, e.g. "ff:ff:ff:ff:ff:ff"
+        @param ethr_type: EtherType field (default 0x0800 for IPv4)
         @param payload: Encapsulated payload (IP layer)
-        @param raw_bytes: Optional raw bytes for parsing
+        @param raw: Optional raw bytes for parsing
         @returns: None
         """
-        super().__init__(payload)
-        self.src_mac = src_mac
-        self.dst_mac = dst_mac
-        self.eth_type = eth_type
+        if raw: 
+        #6 bytes each for the dest and srx mac and 2 bytes for ethr_type
+        #unpack the dest_mac and src_mac
+            self.dest_mac = ':'.join(f'{b:02x}' for b in raw[0:6])
+            self.src_mac = ':'.join(f'{b:02x}' for b in raw[6:12])
+            self.ethr_type = struct.unpack('!H', raw[12:14])[0]
 
-        if raw_bytes is not None:
-            self._from_bytes(raw_bytes)
+            payload_data = raw[14:]
+            #ipv4
+            if self.ethr_type == 0x0800:
+                self.payload= IP(raw=payload_data)
+            else:
+                self.payload = payload_data
+        else:
+            self.dest_mac= dest_mac
+            self.src_mac= src_mac
+            self.ethr_type = ethr_type
+            self.payload = payload 
 
-    def _from_bytes(self, raw_bytes):
+    def to_bytes(self):
         """
         Description: Parses Ethernet header fields from raw bytes and
                      creates an appropriate payload layer (e.g., IP).
 
-        @param raw_bytes: Raw packet bytes.
-        @returns: None
-        """
-        header = raw_bytes[:14]
-        dst, src, eth_type = struct.unpack("!6s6sH", header)
-        self.dst_mac = self._format_mac(dst)
-        self.src_mac = self._format_mac(src)
-        self.eth_type = eth_type
-
-        payload_bytes = raw_bytes[14:]
-        # If IPv4, automatically build an IP layer
-        if self.eth_type == 0x0800:
-            self.payload = IP(raw_bytes=payload_bytes)
-        else:
-            self.payload = payload_bytes
-
-    def _format_mac(self, mac_bytes):
-        """Converts bytes → colon-separated MAC string."""
-        return ":".join(f"{b:02x}" for b in mac_bytes)
-
-    def _parse_mac(self, mac_str):
-        """Converts colon-separated MAC string → bytes."""
-        return bytes(int(x, 16) for x in mac_str.split(":"))
+        @returns: the byte sequence of the the ethernet frame 
     
-    def build(self):
-        """
-        Description: Builds the byte representation of the Ethernet frame
-                     and recursively builds its payload.
-
-        @returns: Complete Ethernet frame.
-        """
-        dst_bytes = self._parse_mac(self.dst_mac)
-        src_bytes = self._parse_mac(self.src_mac)
-
-        header = struct.pack("!6s6sH", dst_bytes, src_bytes, self.eth_type)
-
-        payload_bytes = b""
-        if self.payload:
-            payload_bytes = self.payload.build()
-
-        return header + payload_bytes
-    
-    def show(self, indent=0):
-        print(" " * indent + f"### Ether ###")
-        print(" " * (indent + 1) + f"src_mac: {self.src_mac}")
-        print(" " * (indent + 1) + f"dst_mac: {self.dst_mac}")
-        print(" " * (indent + 1) + f"eth_type: 0x{self.eth_type:04x}")
-        if self.payload:
-            self.payload.show(indent + 1)
-
+      """
+        
+        #convert destination and source MAC adress into 6 bytes
+        dest_bytes= bytes(int(x,16) for x in self.dest_mac.split(":"))
+        src_bytes =  bytes(int(x,16) for x in self.src_mac.split(":"))
+        #pack the ethernet type as 2 bytes
+        eth_type_bytes = struct.pack("!H", self.ethr_type)
+        #build payload bytes 
+        payload_bytes = self.payload.to_bytes() if hasattr(self.payload, 'to_bytes') else b''
+        #return full ethernet frame
+        return dest_bytes + src_bytes + eth_type_bytes + payload_bytes
+   

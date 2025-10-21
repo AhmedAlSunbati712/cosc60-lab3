@@ -24,13 +24,11 @@ class Packet:
 
         @returns: (bytes) The full byte sequence of the current layer and all nested payloads.
         """
-        packet_bytes = b''
-        header_bytes = b'' # Override in subclasses with the bytes of the headers
-    
-        packet_bytes += header_bytes
-        if self.payload:
-            packet_bytes += self.payload.build() # Build the bytes of the payload layer recursively
+        packet_bytes = self.to_bytes() if hasattr(self, 'to_bytes') else b''
+        if self.payload: 
+            packet_bytes += self.payload.to_bytes() if hasattr(self.payload, 'to_bytes') else (self.payload if isinstance(self.payload, bytes) else b'')# Build the bytes of the payload layer recursively
         return packet_bytes
+    
     def __truediv__(self, other):
         """
         Description: Overloads the division (/) operator to allow stacking of protocol layers.
@@ -38,19 +36,14 @@ class Packet:
         @param other: The higher-layer packet to encapsulate as this packet’s payload.
         @returns: The current packet instance (to allow chaining).
         """
-        self.payload = other
-
-        # Handle auto IP propagation for transport layers
-        if hasattr(self, 'src_ip') and hasattr(self, 'dst_ip'):
-            # self is likely an IP layer
-            if hasattr(other, 'src_port') and hasattr(other, 'dst_port'):
-                # other is likely TCP or UDP layer
-                if not hasattr(other, 'src_ip'):
-                    other.src_ip = self.src_ip
-                if not hasattr(other, 'dst_ip'):
-                    other.dst_ip = self.dst_ip
-
+        #if paylaod is none or raw bytes replace with nxt layer
+        if self.payload is None or isinstance(self.payload, bytes):
+            self.payload = other
+        else:
+            self.payload / other
         return self
+
+
     def show(self, indent=0):
         """
         Description: Prints a hierarchical, human-readable view of the packet’s header fields and payload layers.
@@ -64,4 +57,9 @@ class Packet:
             if key != "payload":
                 print(" " * (indent + 1) + f"{key}: {value}")
         if self.payload:
-            self.payload.show(indent + 1)
+            if isinstance(self.payload, Packet):
+                self.payload.show(indent + 1)
+            elif isinstance(self.payload, bytes):
+                print(" " * (indent + 1) + f"payload (raw bytes): {self.payload.hex()}")
+            else:
+                print(" " * (indent + 1) + f"payload (unknown type): {self.payload}")

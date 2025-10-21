@@ -10,124 +10,118 @@ Description: Implements the IPv4 protocol layer (Layer 3).
 import struct
 import socket
 from Packet import Packet
+from ICMP import ICMP
+import random
 
 
 class IP(Packet):
-    def __init__(self, src_ip="0.0.0.0", dst_ip="0.0.0.0", ttl=64, proto=0,
-                 identification=0, flags_fragment=0, raw_bytes=None, payload=None):
+    def __init__(self, src_IP= None, dest_IP= None, payload=None, ttl=128, protocol=1, raw=None):
         """
         Description: Initializes an IPv4 packet. Can construct from provided
                      fields (for sending) or parse from raw bytes (for receiving).
 
-        @param src_ip: Source IPv4 address.
-        @param dst_ip: Destination IPv4 address.
+        @param src_IP: Source IPv4 address.
+        @param dest_IP: Destination IPv4 address.
         @param ttl: Time to Live.
-        @param proto: Protocol number (e.g., 6 for TCP, 17 for UDP).
-        @param identification: Identification field.
-        @param flags_fragment: Flags + Fragment offset field.
-        @param raw_bytes: If provided, parse these bytes.
-        @param payload: Next layer encapsulated.
+        @param payload: the data carried by this layer
+        @param protocol: Protocol number (e.g., 6 for TCP, 17 for UDP).
+        @param raw: If provided, parse these bytes.
         @returns: None
         """
+        # ID: Identification field.
+        # flags_frag: Flags + Fragment offset field.
         super().__init__(payload)
 
-        if raw_bytes:
-            self._parse(raw_bytes)
+        if raw:
+            #first 20 bytes is IP header
+            header = raw[:20]
+            #1byter for the version+ihl and 1 byte TOS  2 bytes eahc for tal length, if, flags_frag
+            #1 byte each for ttl and protocol. 2 bytes for checker sum, and 4 bytes each for src Ip and destip
+            labels = struct.unpack('!BBHHHBBH4s4s', header)
+            version_ihl = labels[0]
+            self.tos = labels[1]
+            self.total_len = labels[2]
+            self.ID = labels[3]
+            self.flags_frag = labels[4]
+            self.TTL = labels[5]
+            self.protocol = labels[6]
+            self.checksum = labels[7]
+            self.src_IP = socket.inet_ntoa(labels[8])
+            self.dest_IP = socket.inet_ntoa(labels[9])
+           
+            #split version and ihl into seperate
+            self.version = version_ihl >> 4
+            self.ihl = version_ihl & 0x0F
+
+            #parse payload
+            payload_data = raw[20:]
+            if self.protocol == 1:
+                self.payload=(ICMP(raw=payload_data))
+            else:
+                self.payload= payload_data
+       
+
+        #default values
         else:
+            super().__init__(payload)
             self.version = 4
-            self.ihl = 5  # header length (in 32-bit words)
+            self.ihl = 5
             self.tos = 0
-            self.total_length = 0  # will fill in later
-            self.identification = identification
-            self.flags_fragment = flags_fragment
-            self.ttl = ttl
-            self.proto = proto
+            self.ID = random.randint(0, 65535)
+            self.flags_frag = 0x4000
+            self.TTL = ttl
+            self.total_len = 0
+            self.protocol = protocol
             self.checksum = 0
-            self.src_ip = src_ip
-            self.dst_ip = dst_ip
-
-    def _parse(self, raw_bytes):
-        """
-        Description: Internal helper to parse an IPv4 header from raw bytes.
-        """
-        (version_ihl, self.tos, self.total_length, self.identification,
-         self.flags_fragment, self.ttl, self.proto, self.checksum,
-         src_ip, dst_ip) = struct.unpack("!BBHHHBBH4s4s", raw_bytes[:20])
-
-        self.version = version_ihl >> 4
-        self.ihl = version_ihl & 0xF
-        self.src_ip = socket.inet_ntoa(src_ip)
-        self.dst_ip = socket.inet_ntoa(dst_ip)
-        self.payload = raw_bytes[self.ihl * 4:]
-
-    def compute_checksum(self, header):
+            self.src_IP = src_IP
+            self.dest_IP = dest_IP
+    
+#used these sources to help me: https://medium.com/@tom_84912/the-quaint-but-critical-internet-checksum-05c09eb0af77
+#https://gist.github.com/david-hoze/0c7021434796997a4ca42d7731a7073a?permalink_comment_id=3949455
+#https://stackoverflow.com/questions/50321292/calculating-ip-checksum-in-c
+    def checksum_IP(self, data):
         """
         Description: Computes IPv4 header checksum.
 
-        @param header: IPv4 header with checksum set to 0.
+        @param data: IPv4 header with checksum set to 0.
         @returns: 16-bit checksum.
         """
-        if len(header) % 2:
-            header += b'\x00'
-        total = sum(struct.unpack('!%dH' % (len(header) // 2), header))
-        total = (total >> 16) + (total & 0xFFFF)
-        total += total >> 16
-        return ~total & 0xFFFF
+        #if odd add extra bit
+        if len(data) % 2:
+            data += b'\x00'
+        #interpt data as a 16 bit big-endian word
+        sumd = sum(struct.unpack('!%dH' % (len(data) //2), data))
+        #carry operations. handles overflow from the 16 bits
+        sumd = (sumd >> 16) + (sumd & 0xFFFF)
+        sumd += sumd >> 16
+        #complment of the 16-bit sum mask to 16 bits
+        return (~sumd) & 0xFFFF
 
-    def build(self):
-        """
-        Description: Builds IPv4 header and recursively appends payload bytes.
 
-        @returns: Complete IPv4 packet (header + payload).
-        """
-        payload_bytes = self.payload.build() if self.payload else b''
-        self.total_length = 20 + len(payload_bytes)
+        
+    def to_bytes(self):
+        '''
+        Description: Byte representation of the IPv4 packet
+        @returns: complete byte sequence of the IP packet
+        '''
 
         version_ihl = (self.version << 4) + self.ihl
-        header_wo_checksum = struct.pack(
-            "!BBHHHBBH4s4s",
-            version_ihl,
-            self.tos,
-            self.total_length,
-            self.identification,
-            self.flags_fragment,
-            self.ttl,
-            self.proto,
-            0,
-            socket.inet_aton(self.src_ip),
-            socket.inet_aton(self.dst_ip)
-        )
-
-        self.checksum = self.compute_checksum(header_wo_checksum)
-
-        header = struct.pack(
-            "!BBHHHBBH4s4s",
-            version_ihl,
-            self.tos,
-            self.total_length,
-            self.identification,
-            self.flags_fragment,
-            self.ttl,
-            self.proto,
-            self.checksum,
-            socket.inet_aton(self.src_ip),
-            socket.inet_aton(self.dst_ip)
-        )
-
+        # if self.payload:
+        #     payload_b = self.payload.to_bytes() if hasattr(self.payload, 'to_bytes') else (self.payload if isinstance(self.payload, bytes) else b'')
+        # else:
+        #     payload_b = b''
+        payload_bytes = self.payload.to_bytes() if hasattr(self.payload, 'to_bytes') else b''
+        self.total_len = 20 + len(payload_bytes)
+    
+        #pass in 0 as a place holder for the checksum and convert ip string to bytes
+        IP_header = struct.pack('!BBHHHBBH4s4s', version_ihl, self.tos, self.total_len, 
+                                self.ID, self.flags_frag, self.TTL, self.protocol, 0, socket.inet_aton(self.src_IP), socket.inet_aton(self.dest_IP))
+        #calcuate checksum
+        self.checksum = self.checksum_IP(IP_header)
+        header = struct.pack('!BBHHHBBH4s4s', version_ihl, self.tos, self.total_len, self.ID, self.flags_frag, 
+                                self.TTL, self.protocol, self.checksum, socket.inet_aton(self.src_IP), socket.inet_aton(self.dest_IP))
+        #add payload to ipheader
+    
         return header + payload_bytes
 
-    def show(self, indent=0):
-        """
-        Description: Displays a human-readable view of IPv4 header fields.
-
-        @param indent: Indentation level for nested layers.
-        @returns: None
-        """
-        print(" " * indent + f"### IP (Layer 3) ###")
-        print(" " * (indent + 1) + f"src_ip: {self.src_ip}")
-        print(" " * (indent + 1) + f"dst_ip: {self.dst_ip}")
-        print(" " * (indent + 1) + f"ttl: {self.ttl}")
-        print(" " * (indent + 1) + f"proto: {self.proto}")
-        print(" " * (indent + 1) + f"checksum: 0x{self.checksum:04x}")
-        if self.payload:
-            self.payload.show(indent + 1)
+   
